@@ -158,7 +158,7 @@ st.divider()
 # ------------------------------------------------------------
 # CSV 자동 로드
 # ------------------------------------------------------------
-CSV_PATH = "data/seoul_emergency_hospitals3.csv"
+CSV_PATH = "seoul_emergency_hospitals3.csv"
 if os.path.exists(CSV_PATH):
     st.caption("📁 자동으로 CSV 파일을 불러왔어요.")
     hospitals = pd.read_csv(CSV_PATH, encoding="utf-8")
