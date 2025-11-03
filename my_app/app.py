@@ -1,23 +1,17 @@
 # -*- coding: utf-8 -*-
-import io
 import math
 import datetime
+import os
 import pandas as pd
 import numpy as np
 import streamlit as st
 import pydeck as pdk
-import os
 from streamlit_js_eval import get_geolocation
 
 # ------------------------------------------------------------
 # 🌐 다국어 리소스 (한국어 / 영어 / 프랑스어 / 중국어)
 # ------------------------------------------------------------
-LANGS = {
-    "ko": "한국어",
-    "en": "English",
-    "fr": "Français",
-    "zh": "中文",
-}
+LANGS = {"ko": "한국어", "en": "English", "fr": "Français", "zh": "中文"}
 
 I18N = {
     "title": {
@@ -47,7 +41,7 @@ I18N = {
     "due_info": {
         "ko": "📅 출산까지 {d}일 남았어요. 미리 병원 위치를 확인해두면 마음이 한결 편해요 💕",
         "en": "📅 {d} days left. Check hospital locations in advance for peace of mind 💕",
-        "fr": "📅 Il reste {d} jours avant l’accouchement. Vérifiez les hôpitaux à l’avance pour être sereine 💕",
+        "fr": "📅 Il reste {d} jours. Vérifiez les hôpitaux à l’avance pour être sereine 💕",
         "zh": "📅 距离分娩还有 {d} 天。提前确认医院位置更安心 💕",
     },
     "calm": {
@@ -65,10 +59,7 @@ I18N = {
     "lat": {"ko": "위도", "en": "Latitude", "fr": "Latitude", "zh": "纬度"},
     "lon": {"ko": "경도", "en": "Longitude", "fr": "Longitude", "zh": "经度"},
     "radius": {
-        "ko": "탐색 반경(km)",
-        "en": "Search radius (km)",
-        "fr": "Rayon de recherche (km)",
-        "zh": "搜索半径（公里）",
+        "ko": "탐색 반경(km)", "en": "Search radius (km)", "fr": "Rayon de recherche (km)", "zh": "搜索半径（公里）",
     },
     "filter_birth": {
         "ko": "👶 분만 가능한 병원만 보기",
@@ -107,36 +98,29 @@ def t(key, lang, **kwargs):
 st.set_page_config(page_title="Emergency Hospitals", layout="wide")
 
 # ------------------------------------------------------------
-# 🌐 언어 선택
+# 🌐 언어 선택 (버튼)
 # ------------------------------------------------------------
-st.markdown("### 🌐 Language Selection")
+st.markdown("### 🌐 Language")
 if "lang" not in st.session_state:
     st.session_state["lang"] = "ko"
-
 col1, col2, col3, col4 = st.columns(4)
 if col1.button("🇰🇷 한국어"): st.session_state["lang"] = "ko"
 if col2.button("🇺🇸 English"): st.session_state["lang"] = "en"
 if col3.button("🇫🇷 Français"): st.session_state["lang"] = "fr"
 if col4.button("🇨🇳 中文"): st.session_state["lang"] = "zh"
-
 lang = st.session_state["lang"]
 
 # ------------------------------------------------------------
-# 타이틀 & 안내 문구
+# 타이틀 & 배너
 # ------------------------------------------------------------
 st.title(t("title", lang))
 st.markdown(
-    f"""
-    <div style='text-align:center; background-color:#FF4B4B; color:white;
-                padding:14px; border-radius:12px; font-size:20px; font-weight:700;'>
-        {t("banner", lang)}
-    </div>
-    """,
+    f"<div style='text-align:center; background-color:#FF4B4B; color:white; padding:14px; border-radius:12px; font-size:20px; font-weight:700;'>{t('banner', lang)}</div>",
     unsafe_allow_html=True
 )
 
 # ------------------------------------------------------------
-# 출산일 안내
+# 출산일 안내 + 심리 안정
 # ------------------------------------------------------------
 due_date = st.date_input(t("due_input", lang), datetime.date.today())
 days_left = (due_date - datetime.date.today()).days
@@ -144,27 +128,24 @@ if days_left <= 30:
     st.warning(t("due_warn", lang, d=max(days_left, 0)))
 else:
     st.info(t("due_info", lang, d=days_left))
-
-st.markdown(
-    f"<div style='text-align:center; color:#555; font-size:16px; margin-top:6px;'>{t('calm', lang)}</div>",
-    unsafe_allow_html=True
-)
+st.markdown(f"<div style='text-align:center; color:#555; font-size:16px; margin-top:6px;'>{t('calm', lang)}</div>", unsafe_allow_html=True)
 st.divider()
 
 # ------------------------------------------------------------
-# CSV 파일 자동 로드 (현재 폴더)
+# ✅ CSV 자동 로드 (절대경로 — Streamlit Cloud/로컬 모두 호환)
 # ------------------------------------------------------------
-CSV_PATH = "seoul_emergency_hospitals3.csv"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_PATH = os.path.join(BASE_DIR, "seoul_emergency_hospitals3.csv")
 
 if os.path.exists(CSV_PATH):
     st.caption("📁 CSV 파일을 성공적으로 불러왔어요!")
     hospitals = pd.read_csv(CSV_PATH, encoding="utf-8")
 else:
-    st.error("⚠️ CSV 파일을 찾을 수 없습니다. app.py와 같은 폴더에 있는지 확인하세요.")
+    st.error(f"⚠️ CSV 파일을 찾을 수 없습니다.\n현재 찾고 있는 경로: {CSV_PATH}")
     st.stop()
 
 # ------------------------------------------------------------
-# 거리 계산 함수
+# 유틸: 거리 계산
 # ------------------------------------------------------------
 def calc_distance(lat1, lon1, lat2, lon2):
     R = 6371.0
@@ -175,90 +156,93 @@ def calc_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 # ------------------------------------------------------------
-# 위치 설정
+# 내 위치 설정 (GPS + 수동)
 # ------------------------------------------------------------
 st.markdown("### 📍 " + t("gps_btn", lang))
 if "user_lat" not in st.session_state:
     st.session_state["user_lat"] = 37.5665
     st.session_state["user_lon"] = 126.9780
 
-col_a, col_b, col_c, col_d = st.columns(4)
-if col_a.button(t("gps_btn", lang)):
+c1, c2, c3, c4 = st.columns(4)
+if c1.button(t("gps_btn", lang)):
     loc = get_geolocation()
     if loc and "coords" in loc:
         st.session_state["user_lat"] = loc["coords"]["latitude"]
         st.session_state["user_lon"] = loc["coords"]["longitude"]
+st.session_state["user_lat"] = c2.number_input(t("lat", lang), value=st.session_state["user_lat"], format="%.6f")
+st.session_state["user_lon"] = c3.number_input(t("lon", lang), value=st.session_state["user_lon"], format="%.6f")
+radius_km = c4.slider(t("radius", lang), 2, 30, 10)
 
-st.session_state["user_lat"] = col_b.number_input(t("lat", lang), value=st.session_state["user_lat"], format="%.6f")
-st.session_state["user_lon"] = col_c.number_input(t("lon", lang), value=st.session_state["user_lon"], format="%.6f")
-radius_km = col_d.slider(t("radius", lang), 2, 30, 10)
-
-user_lat = st.session_state["user_lat"]
-user_lon = st.session_state["user_lon"]
+user_lat = float(st.session_state["user_lat"])
+user_lon = float(st.session_state["user_lon"])
 
 # ------------------------------------------------------------
-# 가상 데이터 생성 (병상, 대기, 분만 가능)
+# 가상 수용 지표(시뮬레이션): 대기/병상/분만가능
 # ------------------------------------------------------------
 np.random.seed(42)
 hospitals["대기인원"] = np.random.randint(0, 31, size=len(hospitals))
 hospitals["입원가능병상"] = np.random.randint(0, 21, size=len(hospitals))
 hospitals["분만가능"] = np.random.choice([True, False], size=len(hospitals), p=[0.3, 0.7])
 
-available_hospitals = hospitals[hospitals["입원가능병상"] > 0].copy()
-available_hospitals["distance_km"] = available_hospitals.apply(
+# 좌표 컬럼 이름 가정: "병원위도", "병원경도", "병원명" (필요 시 여러분 CSV에 맞게 바꾸세요)
+available = hospitals[hospitals["입원가능병상"] > 0].copy()
+available["distance_km"] = available.apply(
     lambda r: calc_distance(user_lat, user_lon, float(r["병원위도"]), float(r["병원경도"])), axis=1
 )
-available_hospitals = available_hospitals.sort_values("distance_km").reset_index(drop=True)
+available = available[available["distance_km"] <= radius_km].sort_values("distance_km").reset_index(drop=True)
 
-# ✅ 분만 가능 필터
+# 🔎 분만가능 필터
 only_birth = st.checkbox(t("filter_birth", lang))
 if only_birth:
-    available_hospitals = available_hospitals[available_hospitals["분만가능"] == True]
+    available = available[available["분만가능"] == True]
 
 # ------------------------------------------------------------
-# 지도 색상 (대기인원 기준)
+# 지도 색상: 대기인원(0~30) → 초록~빨강
 # ------------------------------------------------------------
 def wait_color(wait):
-    ratio = min(wait / 30, 1)
+    ratio = min(max(wait, 0) / 30, 1)
     r = int(255 * ratio)
     g = int(255 * (1 - ratio))
     return [r, g, 0]
-
-available_hospitals["color"] = available_hospitals["대기인원"].apply(wait_color)
+available["color"] = available["대기인원"].apply(wait_color)
 
 # ------------------------------------------------------------
-# 지도 시각화
+# 지도 시각화 (pydeck)
 # ------------------------------------------------------------
 hospital_layer = pdk.Layer(
     "ScatterplotLayer",
-    data=available_hospitals,
+    data=available,
     get_position="[병원경도, 병원위도]",
     get_radius=80,
     get_fill_color="color",
     pickable=True,
+    radius_min_pixels=6,
+    radius_max_pixels=24,
 )
-
-me_df = pd.DataFrame([{"lon": user_lon, "lat": user_lat, "name": "내 위치"}])
+me_df = pd.DataFrame([{"lon": user_lon, "lat": user_lat, "name": "Me"}])
 me_layer = pdk.Layer("ScatterplotLayer", data=me_df, get_position="[lon, lat]", get_radius=120, get_fill_color=[0, 0, 255])
 
-layers = [hospital_layer, me_layer]
 tooltip = {
     "html": "<b>{병원명}</b><br/>거리: {distance_km:.2f} km<br/>대기인원: {대기인원}<br/>입원가능병상: {입원가능병상}<br/>분만가능: {분만가능}",
     "style": {"backgroundColor": "white", "color": "black"},
 }
-st.pydeck_chart(pdk.Deck(layers=layers, initial_view_state=pdk.ViewState(latitude=user_lat, longitude=user_lon, zoom=12), tooltip=tooltip))
+st.pydeck_chart(
+    pdk.Deck(layers=[hospital_layer, me_layer], initial_view_state=pdk.ViewState(latitude=user_lat, longitude=user_lon, zoom=12), tooltip=tooltip),
+    use_container_width=True
+)
 
 # ------------------------------------------------------------
-# 병원 표 출력
+# 표 (상위 50개)
 # ------------------------------------------------------------
 st.markdown("### 🏥 입원 가능 병상 있는 병원 (대기인원 기준)")
-st.dataframe(available_hospitals[["병원명", "distance_km", "대기인원", "입원가능병상", "분만가능"]].head(50), use_container_width=True)
+cols = ["병원명", "distance_km", "대기인원", "입원가능병상", "분만가능"]
+st.dataframe(available[cols].head(50), use_container_width=True)
 
 # ------------------------------------------------------------
-# 병원 등록 게임화
+# 게임화: 나의 응급 병원 등록
 # ------------------------------------------------------------
-col1, col2 = st.columns([1, 3])
-if col1.button(t("register_btn", lang)):
+cA, cB = st.columns([1, 3])
+if cA.button(t("register_btn", lang)):
     st.session_state["registered"] = True
     st.balloons()
     st.success(t("registered_ok", lang))
@@ -271,3 +255,4 @@ st.markdown(
     f"<div style='text-align:center; color:#444; font-size:16px; margin-top:10px;'>{t('footer_119', lang)} &nbsp;&nbsp; <a href='tel:119'>[119]</a></div>",
     unsafe_allow_html=True
 )
+
