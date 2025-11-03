@@ -10,7 +10,7 @@ import os
 from streamlit_js_eval import get_geolocation
 
 # ------------------------------------------------------------
-# 🌐 다국어 리소스
+# 🌐 다국어 리소스 (한국어 / 영어 / 프랑스어 / 중국어)
 # ------------------------------------------------------------
 LANGS = {
     "ko": "한국어",
@@ -107,7 +107,7 @@ def t(key, lang, **kwargs):
 st.set_page_config(page_title="Emergency Hospitals", layout="wide")
 
 # ------------------------------------------------------------
-# 🌐 언어 선택 버튼
+# 🌐 언어 선택
 # ------------------------------------------------------------
 st.markdown("### 🌐 Language Selection")
 if "lang" not in st.session_state:
@@ -122,7 +122,7 @@ if col4.button("🇨🇳 中文"): st.session_state["lang"] = "zh"
 lang = st.session_state["lang"]
 
 # ------------------------------------------------------------
-# 타이틀 + 배너
+# 타이틀 & 안내 문구
 # ------------------------------------------------------------
 st.title(t("title", lang))
 st.markdown(
@@ -136,7 +136,7 @@ st.markdown(
 )
 
 # ------------------------------------------------------------
-# 출산일 입력 + 심리 안정 메시지
+# 출산일 안내
 # ------------------------------------------------------------
 due_date = st.date_input(t("due_input", lang), datetime.date.today())
 days_left = (due_date - datetime.date.today()).days
@@ -146,17 +146,13 @@ else:
     st.info(t("due_info", lang, d=days_left))
 
 st.markdown(
-    f"""
-    <div style='text-align:center; color:#555; font-size:16px; margin-top:6px;'>
-        {t("calm", lang)}
-    </div>
-    """,
+    f"<div style='text-align:center; color:#555; font-size:16px; margin-top:6px;'>{t('calm', lang)}</div>",
     unsafe_allow_html=True
 )
 st.divider()
 
 # ------------------------------------------------------------
-# CSV 자동 로드 (현재 폴더에서 찾기)
+# CSV 파일 자동 로드 (현재 폴더)
 # ------------------------------------------------------------
 CSV_PATH = "seoul_emergency_hospitals3.csv"
 
@@ -174,7 +170,7 @@ def calc_distance(lat1, lon1, lat2, lon2):
     R = 6371.0
     d_lat = math.radians(lat2 - lat1)
     d_lon = math.radians(lon2 - lon1)
-    a = math.sin(d_lat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(d_lon / 2) ** 2
+    a = math.sin(d_lat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(d_lon / 2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
@@ -201,7 +197,7 @@ user_lat = st.session_state["user_lat"]
 user_lon = st.session_state["user_lon"]
 
 # ------------------------------------------------------------
-# 가상 병상 데이터 생성
+# 가상 데이터 생성 (병상, 대기, 분만 가능)
 # ------------------------------------------------------------
 np.random.seed(42)
 hospitals["대기인원"] = np.random.randint(0, 31, size=len(hospitals))
@@ -214,9 +210,7 @@ available_hospitals["distance_km"] = available_hospitals.apply(
 )
 available_hospitals = available_hospitals.sort_values("distance_km").reset_index(drop=True)
 
-# ------------------------------------------------------------
-# ✅ 필터: 분만 가능한 병원만 보기
-# ------------------------------------------------------------
+# ✅ 분만 가능 필터
 only_birth = st.checkbox(t("filter_birth", lang))
 if only_birth:
     available_hospitals = available_hospitals[available_hospitals["분만가능"] == True]
@@ -225,8 +219,7 @@ if only_birth:
 # 지도 색상 (대기인원 기준)
 # ------------------------------------------------------------
 def wait_color(wait):
-    max_wait = 30
-    ratio = min(wait / max_wait, 1)
+    ratio = min(wait / 30, 1)
     r = int(255 * ratio)
     g = int(255 * (1 - ratio))
     return [r, g, 0]
@@ -246,13 +239,7 @@ hospital_layer = pdk.Layer(
 )
 
 me_df = pd.DataFrame([{"lon": user_lon, "lat": user_lat, "name": "내 위치"}])
-me_layer = pdk.Layer(
-    "ScatterplotLayer",
-    data=me_df,
-    get_position="[lon, lat]",
-    get_radius=120,
-    get_fill_color=[0, 0, 255],
-)
+me_layer = pdk.Layer("ScatterplotLayer", data=me_df, get_position="[lon, lat]", get_radius=120, get_fill_color=[0, 0, 255])
 
 layers = [hospital_layer, me_layer]
 tooltip = {
@@ -262,14 +249,13 @@ tooltip = {
 st.pydeck_chart(pdk.Deck(layers=layers, initial_view_state=pdk.ViewState(latitude=user_lat, longitude=user_lon, zoom=12), tooltip=tooltip))
 
 # ------------------------------------------------------------
-# 표 출력
+# 병원 표 출력
 # ------------------------------------------------------------
 st.markdown("### 🏥 입원 가능 병상 있는 병원 (대기인원 기준)")
-view_cols = ["병원명", "distance_km", "대기인원", "입원가능병상", "분만가능"]
-st.dataframe(available_hospitals[view_cols].head(50), use_container_width=True)
+st.dataframe(available_hospitals[["병원명", "distance_km", "대기인원", "입원가능병상", "분만가능"]].head(50), use_container_width=True)
 
 # ------------------------------------------------------------
-# 병원 등록(게임화)
+# 병원 등록 게임화
 # ------------------------------------------------------------
 col1, col2 = st.columns([1, 3])
 if col1.button(t("register_btn", lang)):
@@ -282,10 +268,6 @@ st.progress(100 if st.session_state.get("registered") else 40, text=t("progress_
 # 하단 안내
 # ------------------------------------------------------------
 st.markdown(
-    f"""
-    <div style='text-align:center; color:#444; font-size:16px; margin-top:10px;'>
-        {t("footer_119", lang)} &nbsp;&nbsp; <a href="tel:119">[119]</a>
-    </div>
-    """,
+    f"<div style='text-align:center; color:#444; font-size:16px; margin-top:10px;'>{t('footer_119', lang)} &nbsp;&nbsp; <a href='tel:119'>[119]</a></div>",
     unsafe_allow_html=True
 )
