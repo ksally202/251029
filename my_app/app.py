@@ -156,17 +156,16 @@ st.markdown(
 st.divider()
 
 # ------------------------------------------------------------
-# CSV 자동 로드
+# CSV 자동 로드 (현재 폴더에서 찾기)
 # ------------------------------------------------------------
 CSV_PATH = "seoul_emergency_hospitals3.csv"
+
 if os.path.exists(CSV_PATH):
-    st.caption("📁 자동으로 CSV 파일을 불러왔어요.")
+    st.caption("📁 CSV 파일을 성공적으로 불러왔어요!")
     hospitals = pd.read_csv(CSV_PATH, encoding="utf-8")
 else:
-    st.error("⚠️ CSV 파일을 찾을 수 없습니다. data 폴더에 넣어주세요.")
+    st.error("⚠️ CSV 파일을 찾을 수 없습니다. app.py와 같은 폴더에 있는지 확인하세요.")
     st.stop()
-
-st.success("✅ 병원 데이터 불러오기 성공!")
 
 # ------------------------------------------------------------
 # 거리 계산 함수
